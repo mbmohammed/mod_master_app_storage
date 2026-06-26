@@ -1,0 +1,26 @@
+name: Telegram to GitHub Remote Upload
+on:
+  workflow_dispatch:
+    inputs:
+      file_url:
+        description: 'የቴሌግራም ፋይል ሊንክ (Direct Link)'
+        required: true
+      file_name:
+        description: 'የፋይሉ ስም (ለምሳሌ app.apk)'
+        required: true
+
+jobs:
+  download_and_upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download File from Telegram
+        run: |
+          curl -L -o "${{ github.event.inputs.file_name }}" "${{ github.event.inputs.file_url }}"
+      
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v1.0"
+          files: ${{ github.event.inputs.file_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
