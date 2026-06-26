@@ -13,9 +13,9 @@ jobs:
   download_and_upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Download File from Telegram
+      - name: Download File using Wget
         run: |
-          curl -L -o "${{ github.event.inputs.file_name }}" "${{ github.event.inputs.file_url }}"
+          wget --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -O "${{ github.event.inputs.file_name }}" "${{ github.event.inputs.file_url }}"
       
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
@@ -24,3 +24,4 @@ jobs:
           files: ${{ github.event.inputs.file_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
