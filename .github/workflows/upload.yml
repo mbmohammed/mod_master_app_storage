@@ -20,14 +20,12 @@ jobs:
       run: |
         LINK=$(cat latest_link.txt | tr -d '\r' | tr -d '\n' | xargs)
         
-        # ሊንኩ .apk ካለው ኦሪጅናል ስሙን ይይዛል፣ ከሌለው የHerokuን ልዩ መለያ ቁጥር ስም ያደርገዋል
         if [[ "$LINK" == *.apk* ]]; then
           FILENAME=$(basename "$LINK" | cut -d? -f1)
         else
           FILENAME=$(basename "$LINK").apk
         fi
         
-        # ስሙ ባዶ ወይም የተበላሸ ከሆነ በሰከንድ ቁጥር ይተካዋል
         if [[ -z "$FILENAME" || "$FILENAME" == *.com* ]]; then
           FILENAME="app_$(date +%s).apk"
         fi
@@ -37,13 +35,17 @@ jobs:
 
     - name: Download APK Directly
       run: |
-        echo "📥 አፑን በስሙ [ ${{ env.APK_NAME }} ] ማውረድ ተጀምሯል..."
-        # -o በመጠቀም ማሽኑ ሰርቨሩን ሳይጠይቅ በግድ እኛ በሰጠነው ስም እንዲያወርደው እናደርጋለን (ይህ መቼም አይሳሳትም)
-        curl -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o "${{ env.APK_NAME }}" "${{ env.TG_LINK }}"
+        echo "📥 አፑን ማውረድ ተጀምሯል..."
+        curl -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o "${{ env.APK_NAME }}" "${{ env.TG_LINK }}"
         
-        # ፋይሉ በትክክል መውረዱን ማረጋገጫ
-        if [ ! -s "${{ env.APK_NAME }}" ]; then
-          echo "❌ ፋይሉ አልወረደም ወይም ሊንኩ ባዶ ነው!"
+        # የፋይሉን መጠን በካይት (Bytes) ይለካል
+        FILE_SIZE=$(stat -c%s "${{ env.APK_NAME }}")
+        echo "💡 የወረደው ፋይል መጠን: $FILE_SIZE Bytes"
+        
+        # ፋይሉ ከ 50KB በታች ከሆነ አፕ አይደለም (የስህተት ገጽ ነው) ማለት ስለሆነ እንዲያቆም እናደርጋለን
+        if [ "$FILE_SIZE" -lt 50000 ]; then
+          echo "❌ ስህተት: የወረደው ፋይል እውነተኛ አፕ አይደለም (በጣም ትንሽ ነው)! ሊንኩ አልፏል ወይም የተበላሸ ነው።"
+          rm "${{ env.APK_NAME }}"
           exit 1
         fi
 
@@ -51,8 +53,5 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # v1.0 የተባለ የሪሊዝ ገጽ ከሌለ መጀመሪያ ይፈጥረዋል
         gh release view v1.0 || gh release create v1.0 --title "Mod Master Store" --notes "Uploaded via Admin UI"
-        
-        # አፑን ወደ ሪሊዝ ይጭነዋል
         gh release upload v1.0 "${{ env.APK_NAME }}" --clobber
