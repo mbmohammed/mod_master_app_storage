@@ -19,48 +19,40 @@ jobs:
     - name: Read and Clean Download Link
       run: |
         LINK=$(cat latest_link.txt | tr -d '\r' | tr -d '\n' | xargs)
+        
+        # ሊንኩ .apk ካለው ኦሪጅናል ስሙን ይይዛል፣ ከሌለው የHerokuን ልዩ መለያ ቁጥር ስም ያደርገዋል
+        if [[ "$LINK" == *.apk* ]]; then
+          FILENAME=$(basename "$LINK" | cut -d? -f1)
+        else
+          FILENAME=$(basename "$LINK").apk
+        fi
+        
+        # ስሙ ባዶ ወይም የተበላሸ ከሆነ በሰከንድ ቁጥር ይተካዋል
+        if [[ -z "$FILENAME" || "$FILENAME" == *.com* ]]; then
+          FILENAME="app_$(date +%s).apk"
+        fi
+        
         echo "TG_LINK=$LINK" >> $GITHUB_ENV
+        echo "APK_NAME=$FILENAME" >> $GITHUB_ENV
 
-    - name: Download and Process APK
+    - name: Download APK Directly
       run: |
-        echo "📥 አፑን ደህንነቱ በተጠበቀ ማውጫ ውስጥ በማውረድ ላይ..."
-        # አላስፈላጊ የ GitHub ፋይሎች እንዳያደናቅፉት የተለየ ንጹህ ፎልደር እንፈጥራለን
-        mkdir -p temp_download
-        cd temp_download
-
-        # ፋይሉን ያወርዳል (የHeroku ሊንክ አቅጣጫ ቢያስቀይርም በትክክል ይከተላል)
-        curl -L -J -O -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${{ env.TG_LINK }}"
-
-        # የወረደውን ፋይል ስም ብቻ ለይቶ ይይዛል
-        DOWNLOADED_FILE=$(ls -1 | head -n 1)
-
-        if [ -z "$DOWNLOADED_FILE" ]; then
-          echo "❌ ምንም ፋይል አልወረደም! ሊንኩ ተበላሽቷል ወይም ጊዜው አልፏል።"
+        echo "📥 አፑን በስሙ [ ${{ env.APK_NAME }} ] ማውረድ ተጀምሯል..."
+        # -o በመጠቀም ማሽኑ ሰርቨሩን ሳይጠይቅ በግድ እኛ በሰጠነው ስም እንዲያወርደው እናደርጋለን (ይህ መቼም አይሳሳትም)
+        curl -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -o "${{ env.APK_NAME }}" "${{ env.TG_LINK }}"
+        
+        # ፋይሉ በትክክል መውረዱን ማረጋገጫ
+        if [ ! -s "${{ env.APK_NAME }}" ]; then
+          echo "❌ ፋይሉ አልወረደም ወይም ሊንኩ ባዶ ነው!"
           exit 1
         fi
-
-        echo "💡 የወረደው ፋይል ስም: $DOWNLOADED_FILE"
-
-        # ፋይሉ መጨረሻው .apk ካልሆነ በግድ ወደ .apk ይቀይረዋል
-        if [[ "$DOWNLOADED_FILE" != *.apk ]]; then
-          # በሰከንድ ቁጥር ልዩ ስም ይሰጠዋል (በዚህም አፖች እርስ በእርስ አይደራረቡም)
-          FINAL_NAME="app_$(date +%s).apk"
-          mv "$DOWNLOADED_FILE" "$FINAL_NAME"
-          echo "🔄 ስሙ ወደ $FINAL_NAME ተቀይሯል"
-        else
-          FINAL_NAME="$DOWNLOADED_FILE"
-        fi
-
-        # ፋይሉን ወደ ዋናው ማውጫ ያንቀሳቅሰዋል
-        mv "$FINAL_NAME" ../
-        cd ..
 
     - name: Upload to GitHub Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         # v1.0 የተባለ የሪሊዝ ገጽ ከሌለ መጀመሪያ ይፈጥረዋል
-        gh release view v1.0 || gh release create v1.0 --title "Mod Master Store" --notes "All uploaded applications via Admin UI"
+        gh release view v1.0 || gh release create v1.0 --title "Mod Master Store" --notes "Uploaded via Admin UI"
         
-        # የወረደውን አፕሊኬሽን ወደ ሪሊዝ ይጭነዋል
-        gh release upload v1.0 *.apk --clobber
+        # አፑን ወደ ሪሊዝ ይጭነዋል
+        gh release upload v1.0 "${{ env.APK_NAME }}" --clobber
