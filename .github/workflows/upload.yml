@@ -6,7 +6,7 @@ on:
       - 'latest_link.txt'
 
 permissions:
-  contents: write # ለሪሊዝ መጫኛ ተጨማሪ የደህንነት ፍቃድ
+  contents: write
 
 jobs:
   build:
@@ -16,20 +16,29 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v3
 
-    - name: Read Download Link
+    - name: Read and Clean Download Link
       run: |
-        LINK=$(cat latest_link.txt)
+        LINK=$(cat latest_link.txt | tr -d '\r' | tr -d '\n' | xargs)
         echo "TG_LINK=$LINK" >> $GITHUB_ENV
 
-    - name: Download APK from Telegram
+    - name: Download APK with Original Name
       run: |
-        wget --user-agent="Mozilla/5.0" -O mod_master_app.apk "${{ env.TG_LINK }}"
+        echo "📥 አፑን ከቦቱ ላይ ኦሪጅናል ስሙንና .apk ፎርማቱን ጠብቆ በማውረድ ላይ..."
+        # --content-disposition ሰርቨሩ የደበቀውን እውነተኛ ስም (ለምሳሌ Game_mod.apk) አይቶ እንዲያወርደው ያደርጋል
+        wget --trust-server-names --content-disposition --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "${{ env.TG_LINK }}"
+        
+        # የወረደ የ .apk ፋይል መኖሩን ማረጋገጥ
+        if [ ! -f *.apk ]; then
+          echo "❌ ምንም አይነት የ .apk ፋይል አልወረደም! ሊንኩ ተበላሽቷል ወይም ጊዜው አልፏል።"
+          exit 1
+        fi
 
     - name: Upload to GitHub Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # መጀመሪያ ሪሊዙ መኖሩን ያረጋግጣል፣ ከሌለ ይፈጥራል
-        gh release view v1.0 || gh release create v1.0 --title "Mod Master Storage" --notes "Uploaded automatically via Admin UI"
-        # ከዚያ አፑን ይጭነዋል (የድሮው ካለ ይተካዋል)
-        gh release upload v1.0 mod_master_app.apk --clobber
+        # ሪሊዙ (v1.0) ከሌለ መጀመሪያ ይፈጥረዋል
+        gh release view v1.0 || gh release create v1.0 --title "Mod Master Store" --notes "All uploaded modded applications"
+        
+        # የወረደውን አፕ በራሱ ኦሪጅናል ስም ወደ ሪሊዝ ይጭነዋል (የድሮዎቹን የተለዩ አፖች ሳያጠፋ በጎን ይጨምራቸዋል)
+        gh release upload v1.0 *.apk --clobber
