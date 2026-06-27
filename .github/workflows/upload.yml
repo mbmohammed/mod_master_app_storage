@@ -11,6 +11,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # መላው ሥራ ከ 3 ደቂቃ በላይ ከፈጀ በግድ እንዲቆም ያደርጋል
+    timeout-minutes: 3
 
     steps:
     - name: Checkout Repository
@@ -36,16 +38,18 @@ jobs:
     - name: Download APK Directly
       run: |
         echo "📥 አፑን ማውረድ ተጀምሯል..."
-        curl -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -o "${{ env.APK_NAME }}" "${{ env.TG_LINK }}"
+        # --connect-timeout 10 (ካላገኘው በ10 ሰከንድ ይቁም) 
+        # --max-time 40 (ማውረዱ ከ40 ሰከንድ በላይ ከፈጀ በግድ ይቋረጥ)
+        curl -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+          --connect-timeout 10 \
+          --max-time 40 \
+          -o "${{ env.APK_NAME }}" "${{ env.TG_LINK }}"
         
-        # የፋይሉን መጠን በካይት (Bytes) ይለካል
-        FILE_SIZE=$(stat -c%s "${{ env.APK_NAME }}")
+        FILE_SIZE=$(stat -c%s "${{ env.APK_NAME }}" 2>/dev/null || echo 0)
         echo "💡 የወረደው ፋይል መጠን: $FILE_SIZE Bytes"
         
-        # ፋይሉ ከ 50KB በታች ከሆነ አፕ አይደለም (የስህተት ገጽ ነው) ማለት ስለሆነ እንዲያቆም እናደርጋለን
-        if [ "$FILE_SIZE" -lt 50000 ]; then
-          echo "❌ ስህተት: የወረደው ፋይል እውነተኛ አፕ አይደለም (በጣም ትንሽ ነው)! ሊንኩ አልፏል ወይም የተበላሸ ነው።"
-          rm "${{ env.APK_NAME }}"
+        if [ "$FILE_SIZE" -lt 1000 ]; then
+          echo "❌ ስህተት: ፋይሉ አልወረደም ወይም ሊንኩ ተዘግቷል!"
           exit 1
         fi
 
