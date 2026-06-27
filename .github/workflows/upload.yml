@@ -21,24 +21,46 @@ jobs:
         LINK=$(cat latest_link.txt | tr -d '\r' | tr -d '\n' | xargs)
         echo "TG_LINK=$LINK" >> $GITHUB_ENV
 
-    - name: Download APK with Original Name
+    - name: Download and Process APK
       run: |
-        echo "📥 አፑን ከቦቱ ላይ ኦሪጅናል ስሙንና .apk ፎርማቱን ጠብቆ በማውረድ ላይ..."
-        # --content-disposition ሰርቨሩ የደበቀውን እውነተኛ ስም (ለምሳሌ Game_mod.apk) አይቶ እንዲያወርደው ያደርጋል
-        wget --trust-server-names --content-disposition --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "${{ env.TG_LINK }}"
-        
-        # የወረደ የ .apk ፋይል መኖሩን ማረጋገጥ
-        if [ ! -f *.apk ]; then
-          echo "❌ ምንም አይነት የ .apk ፋይል አልወረደም! ሊንኩ ተበላሽቷል ወይም ጊዜው አልፏል።"
+        echo "📥 አፑን ደህንነቱ በተጠበቀ ማውጫ ውስጥ በማውረድ ላይ..."
+        # አላስፈላጊ የ GitHub ፋይሎች እንዳያደናቅፉት የተለየ ንጹህ ፎልደር እንፈጥራለን
+        mkdir -p temp_download
+        cd temp_download
+
+        # ፋይሉን ያወርዳል (የHeroku ሊንክ አቅጣጫ ቢያስቀይርም በትክክል ይከተላል)
+        curl -L -J -O -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${{ env.TG_LINK }}"
+
+        # የወረደውን ፋይል ስም ብቻ ለይቶ ይይዛል
+        DOWNLOADED_FILE=$(ls -1 | head -n 1)
+
+        if [ -z "$DOWNLOADED_FILE" ]; then
+          echo "❌ ምንም ፋይል አልወረደም! ሊንኩ ተበላሽቷል ወይም ጊዜው አልፏል።"
           exit 1
         fi
+
+        echo "💡 የወረደው ፋይል ስም: $DOWNLOADED_FILE"
+
+        # ፋይሉ መጨረሻው .apk ካልሆነ በግድ ወደ .apk ይቀይረዋል
+        if [[ "$DOWNLOADED_FILE" != *.apk ]]; then
+          # በሰከንድ ቁጥር ልዩ ስም ይሰጠዋል (በዚህም አፖች እርስ በእርስ አይደራረቡም)
+          FINAL_NAME="app_$(date +%s).apk"
+          mv "$DOWNLOADED_FILE" "$FINAL_NAME"
+          echo "🔄 ስሙ ወደ $FINAL_NAME ተቀይሯል"
+        else
+          FINAL_NAME="$DOWNLOADED_FILE"
+        fi
+
+        # ፋይሉን ወደ ዋናው ማውጫ ያንቀሳቅሰዋል
+        mv "$FINAL_NAME" ../
+        cd ..
 
     - name: Upload to GitHub Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # ሪሊዙ (v1.0) ከሌለ መጀመሪያ ይፈጥረዋል
-        gh release view v1.0 || gh release create v1.0 --title "Mod Master Store" --notes "All uploaded modded applications"
+        # v1.0 የተባለ የሪሊዝ ገጽ ከሌለ መጀመሪያ ይፈጥረዋል
+        gh release view v1.0 || gh release create v1.0 --title "Mod Master Store" --notes "All uploaded applications via Admin UI"
         
-        # የወረደውን አፕ በራሱ ኦሪጅናል ስም ወደ ሪሊዝ ይጭነዋል (የድሮዎቹን የተለዩ አፖች ሳያጠፋ በጎን ይጨምራቸዋል)
+        # የወረደውን አፕሊኬሽን ወደ ሪሊዝ ይጭነዋል
         gh release upload v1.0 *.apk --clobber
