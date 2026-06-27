@@ -3,7 +3,10 @@ name: Auto APK Uploader
 on:
   push:
     paths:
-      - 'latest_link.txt' # ይህ ፋይል በዌብሳይትህ ሲቀየር ማሽኑ በራሱ ይነሳል
+      - 'latest_link.txt'
+
+permissions:
+  contents: write # ለሪሊዝ መጫኛ ተጨማሪ የደህንነት ፍቃድ
 
 jobs:
   build:
@@ -14,7 +17,6 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Read Download Link
-      id: get_link
       run: |
         LINK=$(cat latest_link.txt)
         echo "TG_LINK=$LINK" >> $GITHUB_ENV
@@ -27,4 +29,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create v1.0 mod_master_app.apk --title "Mod Master Storage" --notes "Uploaded automatically via Admin UI" --clobber || gh release upload v1.0 mod_master_app.apk --clobber
+        # መጀመሪያ ሪሊዙ መኖሩን ያረጋግጣል፣ ከሌለ ይፈጥራል
+        gh release view v1.0 || gh release create v1.0 --title "Mod Master Storage" --notes "Uploaded automatically via Admin UI"
+        # ከዚያ አፑን ይጭነዋል (የድሮው ካለ ይተካዋል)
+        gh release upload v1.0 mod_master_app.apk --clobber
